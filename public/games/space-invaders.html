@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Galaxy Defender Space Invaders</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #030712;
+      color: #f3f4f6;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #game-box {
+      position: relative;
+      width: 100%;
+      max-width: 500px;
+      background: #000;
+      border: 2px solid #1f2937;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,255,200,0.1);
+      overflow: hidden;
+    }
+    .hud {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: #111827;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    canvas { display: block; width: 100%; aspect-ratio: 4/3; }
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      background: #111827;
+    }
+    .btn {
+      background: #1f2937;
+      color: #fff;
+      border: 1px solid #374151;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .btn:active { background: #06b6d4; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .overlay.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div id="game-box">
+    <div class="hud">
+      <div>SCORE: <span id="score" style="color: #06b6d4;">0</span></div>
+      <div>WAVE: <span id="wave" style="color: #eab308;">1</span></div>
+      <div>LIVES: <span id="lives" style="color: #ef4444;">❤❤❤</span></div>
+    </div>
+    <canvas id="game" width="480" height="360"></canvas>
+    <div id="overlay" class="overlay">
+      <h2 id="title" style="color: #06b6d4; font-size: 28px;">GALAXY DEFENDER</h2>
+      <p id="sub" style="color: #9ca3af;">A/D or Arrows to Move | Space to Shoot</p>
+      <button id="start-btn" class="btn" style="background: #06b6d4; color: #000;">START MISSION</button>
+    </div>
+    <div class="controls">
+      <button class="btn" id="left-btn">◀ LEFT</button>
+      <button class="btn" id="fire-btn" style="background: #ef4444;">🔥 FIRE</button>
+      <button class="btn" id="right-btn">RIGHT ▶</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const waveEl = document.getElementById('wave');
+    const livesEl = document.getElementById('lives');
+    const overlay = document.getElementById('overlay');
+    const titleEl = document.getElementById('title');
+    const subEl = document.getElementById('sub');
+    const startBtn = document.getElementById('start-btn');
+
+    let player = { x: 220, y: 320, w: 28, h: 16, speed: 5 };
+    let bullets = [];
+    let enemyBullets = [];
+    let aliens = [];
+    let stars = [];
+    let score = 0;
+    let wave = 1;
+    let lives = 3;
+    let alienDir = 1;
+    let alienSpeed = 1;
+    let isRunning = false;
+    let keys = {};
+
+    for(let i=0; i<60; i++) {
+      stars.push({ x: Math.random() * 480, y: Math.random() * 360, s: Math.random() * 2 });
+    }
+
+    function initWave() {
+      aliens = [];
+      const rows = 4;
+      const cols = 8;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          aliens.push({
+            x: 50 + c * 44,
+            y: 40 + r * 30,
+            w: 24,
+            h: 18,
+            type: r,
+            alive: true
+          });
+        }
+      }
+      alienSpeed = 0.8 + wave * 0.2;
+    }
+
+    function start() {
+      score = 0;
+      wave = 1;
+      lives = 3;
+      bullets = [];
+      enemyBullets = [];
+      player.x = 220;
+      scoreEl.textContent = '0';
+      waveEl.textContent = '1';
+      livesEl.textContent = '❤❤❤';
+      initWave();
+      overlay.classList.add('hidden');
+      isRunning = true;
+      loop();
+    }
+
+    function shoot() {
+      if (!isRunning || bullets.length >= 3) return;
+      bullets.push({ x: player.x + player.w / 2 - 2, y: player.y, w: 4, h: 10 });
+    }
+
+    function gameOver(won = false) {
+      isRunning = false;
+      titleEl.textContent = won ? "VICTORY!" : "MISSION FAILED";
+      titleEl.style.color = won ? "#10b981" : "#ef4444";
+      subEl.textContent = `Final Score: ${score}`;
+      startBtn.textContent = "PLAY AGAIN";
+      overlay.classList.remove('hidden');
+    }
+
+    function loop() {
+      if (!isRunning) return;
+
+      // Move player
+      if (keys['ArrowLeft'] || keys['KeyA']) player.x = Math.max(10, player.x - player.speed);
+      if (keys['ArrowRight'] || keys['KeyD']) player.x = Math.min(canvas.width - player.w - 10, player.x + player.speed);
+
+      // Bullets
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.y -= 7;
+        if (b.y < 0) { bullets.splice(i, 1); continue; }
+
+        // Hit alien
+        for (let a of aliens) {
+          if (a.alive && b.x > a.x && b.x < a.x + a.w && b.y > a.y && b.y < a.y + a.h) {
+            a.alive = false;
+            bullets.splice(i, 1);
+            score += (4 - a.type) * 20;
+            scoreEl.textContent = score;
+            break;
+          }
+        }
+      }
+
+      // Alien Movement
+      let hitEdge = false;
+      let livingAliens = aliens.filter(a => a.alive);
+      if (livingAliens.length === 0) {
+        wave++;
+        waveEl.textContent = wave;
+        initWave();
+      }
+
+      livingAliens.forEach(a => {
+        a.x += alienDir * alienSpeed;
+        if (a.x <= 15 || a.x + a.w >= canvas.width - 15) hitEdge = true;
+        if (a.y + a.h >= player.y) gameOver(false);
+      });
+
+      if (hitEdge) {
+        alienDir *= -1;
+        aliens.forEach(a => a.y += 10);
+      }
+
+      // Alien Shooting
+      if (Math.random() < 0.03 && livingAliens.length > 0) {
+        const shooter = livingAliens[Math.floor(Math.random() * livingAliens.length)];
+        enemyBullets.push({ x: shooter.x + shooter.w / 2, y: shooter.y + shooter.h, w: 3, h: 8 });
+      }
+
+      // Enemy Bullets
+      for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        const eb = enemyBullets[i];
+        eb.y += 4;
+        if (eb.y > canvas.height) { enemyBullets.splice(i, 1); continue; }
+
+        // Hit player
+        if (eb.x > player.x && eb.x < player.x + player.w && eb.y > player.y && eb.y < player.y + player.h) {
+          enemyBullets.splice(i, 1);
+          lives--;
+          livesEl.textContent = '❤'.repeat(lives);
+          if (lives <= 0) {
+            gameOver(false);
+            return;
+          }
+        }
+      }
+
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function draw() {
+      ctx.fillStyle = '#030712';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Stars
+      ctx.fillStyle = '#fff';
+      stars.forEach(s => ctx.fillRect(s.x, s.y, s.s, s.s));
+
+      // Player
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillRect(player.x, player.y + 6, player.w, player.h - 6);
+      ctx.fillRect(player.x + player.w / 2 - 4, player.y, 8, 6);
+
+      // Bullets
+      ctx.fillStyle = '#38bdf8';
+      bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+
+      // Enemy Bullets
+      ctx.fillStyle = '#f43f5e';
+      enemyBullets.forEach(eb => ctx.fillRect(eb.x, eb.y, eb.w, eb.h));
+
+      // Aliens
+      const alienColors = ['#f43f5e', '#ec4899', '#a855f7', '#3b82f6'];
+      aliens.forEach(a => {
+        if (!a.alive) return;
+        ctx.fillStyle = alienColors[a.type];
+        ctx.fillRect(a.x + 2, a.y + 2, a.w - 4, a.h - 4);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(a.x + 5, a.y + 5, 3, 3);
+        ctx.fillRect(a.x + a.w - 8, a.y + 5, 3, 3);
+      });
+    }
+
+    window.addEventListener('keydown', e => {
+      keys[e.code] = true;
+      if (e.code === 'Space') { e.preventDefault(); shoot(); }
+    });
+    window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+    document.getElementById('left-btn').onpointerdown = () => { keys['ArrowLeft'] = true; };
+    document.getElementById('left-btn').onpointerup = () => { keys['ArrowLeft'] = false; };
+    document.getElementById('right-btn').onpointerdown = () => { keys['ArrowRight'] = true; };
+    document.getElementById('right-btn').onpointerup = () => { keys['ArrowRight'] = false; };
+    document.getElementById('fire-btn').onclick = shoot;
+    startBtn.onclick = start;
+    draw();
+  </script>
+</body>
+</html>

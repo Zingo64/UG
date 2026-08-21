@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Connect Four Challenge</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .wrap {
+      background: #1e293b;
+      padding: 18px;
+      border-radius: 16px;
+      border: 1px solid #334155;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+    }
+    .hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-weight: bold;
+    }
+    .turn-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #0f172a;
+      padding: 6px 14px;
+      border-radius: 99px;
+    }
+    .dot { width: 14px; height: 14px; border-radius: 50%; }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(7, 44px);
+      grid-template-rows: repeat(6, 44px);
+      gap: 8px;
+      background: #1d4ed8;
+      padding: 10px;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .slot {
+      background: #0f172a;
+      border-radius: 50%;
+      box-shadow: inset 0 3px 6px rgba(0,0,0,0.6);
+      transition: background-color 0.2s;
+    }
+    .slot.p1 { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+    .slot.p2 { background: #eab308; box-shadow: 0 0 10px #eab308; }
+    .btn {
+      background: #334155;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hud">
+      <div class="turn-badge">
+        <div id="turn-dot" class="dot" style="background: #ef4444;"></div>
+        <span id="turn-text">Red's Turn</span>
+      </div>
+      <button class="btn" onclick="init()">Reset</button>
+    </div>
+    <div id="board" class="board"></div>
+  </div>
+
+  <script>
+    const ROWS = 6;
+    const COLS = 7;
+    let grid = [];
+    let turn = 1; // 1 = Red, 2 = Yellow
+    let isGameOver = false;
+
+    const boardEl = document.getElementById('board');
+    const turnDot = document.getElementById('turn-dot');
+    const turnText = document.getElementById('turn-text');
+
+    function init() {
+      grid = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+      turn = 1;
+      isGameOver = false;
+      turnDot.style.background = '#ef4444';
+      turnText.textContent = "Red's Turn";
+      render();
+    }
+
+    function render() {
+      boardEl.innerHTML = '';
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const div = document.createElement('div');
+          div.className = `slot ${grid[r][c] === 1 ? 'p1' : grid[r][c] === 2 ? 'p2' : ''}`;
+          div.onclick = () => dropDisc(c);
+          boardEl.appendChild(div);
+        }
+      }
+    }
+
+    function dropDisc(c) {
+      if (isGameOver) return;
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (grid[r][c] === 0) {
+          grid[r][c] = turn;
+          render();
+          if (checkWin(r, c, turn)) {
+            isGameOver = true;
+            turnText.textContent = `${turn === 1 ? 'Red' : 'Yellow'} Wins!`;
+            return;
+          }
+          turn = turn === 1 ? 2 : 1;
+          turnDot.style.background = turn === 1 ? '#ef4444' : '#eab308';
+          turnText.textContent = `${turn === 1 ? 'Red' : 'Yellow'}'s Turn`;
+
+          if (turn === 2) {
+            setTimeout(aiMove, 300);
+          }
+          return;
+        }
+      }
+    }
+
+    function aiMove() {
+      if (isGameOver) return;
+      // Simple smart AI: check for win, block player, or random valid col
+      for (let c = 0; c < COLS; c++) {
+        const r = getLowestEmptyRow(c);
+        if (r !== -1) {
+          grid[r][c] = 2;
+          if (checkWin(r, c, 2)) { grid[r][c] = 0; dropDisc(c); return; }
+          grid[r][c] = 0;
+        }
+      }
+      for (let c = 0; c < COLS; c++) {
+        const r = getLowestEmptyRow(c);
+        if (r !== -1) {
+          grid[r][c] = 1;
+          if (checkWin(r, c, 1)) { grid[r][c] = 0; dropDisc(c); return; }
+          grid[r][c] = 0;
+        }
+      }
+
+      // Pick center column preferred
+      const preferred = [3, 2, 4, 1, 5, 0, 6];
+      for (let col of preferred) {
+        if (getLowestEmptyRow(col) !== -1) {
+          dropDisc(col);
+          return;
+        }
+      }
+    }
+
+    function getLowestEmptyRow(c) {
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (grid[r][c] === 0) return r;
+      }
+      return -1;
+    }
+
+    function checkWin(r, c, p) {
+      const dirs = [[0,1], [1,0], [1,1], [1,-1]];
+      for (let [dr, dc] of dirs) {
+        let count = 1;
+        for (let i = 1; i < 4; i++) {
+          if (grid[r + dr * i] && grid[r + dr * i][c + dc * i] === p) count++;
+          else break;
+        }
+        for (let i = 1; i < 4; i++) {
+          if (grid[r - dr * i] && grid[r - dr * i][c - dc * i] === p) count++;
+          else break;
+        }
+        if (count >= 4) return true;
+      }
+      return false;
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "Unblocked Games Hub",
+  "description": "A browser game hub featuring a JSON-powered catalog of classic unblocked games playable in an interactive iframe player with search, categories, and custom embed support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
