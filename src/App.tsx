@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Game, CategoryFilterType, SortOption } from './types';
+import { DEFAULT_GAMES } from './data/defaultGames';
 import { Header } from './components/Header';
 import { CategoryFilter } from './components/CategoryFilter';
 import { GameCard } from './components/GameCard';
@@ -9,8 +10,16 @@ import { JsonViewerModal } from './components/JsonViewerModal';
 import { Gamepad2, Sparkles, Flame, History, Search, RefreshCw } from 'lucide-react';
 
 export default function App() {
-  const [games, setGames] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [games, setGames] = useState<Game[]>(() => {
+    try {
+      const savedCustom = localStorage.getItem('unblocked_custom_games');
+      const customGames: Game[] = savedCustom ? JSON.parse(savedCustom) : [];
+      return [...DEFAULT_GAMES, ...customGames];
+    } catch {
+      return DEFAULT_GAMES;
+    }
+  });
+  const [loading, setLoading] = useState(false);
   const [activeGame, setActiveGame] = useState<Game | null>(null);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilterType>('All');
@@ -35,23 +44,21 @@ export default function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
 
-  // Load games from games.json
+  // Load games from games.json if available
   useEffect(() => {
     async function fetchGames() {
       try {
-        setLoading(true);
-        const res = await fetch('/games.json');
-        if (!res.ok) throw new Error('Failed to load games.json');
+        const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+        const res = await fetch(`${base}games.json`);
+        if (!res.ok) return;
         const data: Game[] = await res.json();
-
-        // Merge with local custom games if any
-        const savedCustom = localStorage.getItem('unblocked_custom_games');
-        const customGames: Game[] = savedCustom ? JSON.parse(savedCustom) : [];
-        setGames([...data, ...customGames]);
+        if (Array.isArray(data) && data.length > 0) {
+          const savedCustom = localStorage.getItem('unblocked_custom_games');
+          const customGames: Game[] = savedCustom ? JSON.parse(savedCustom) : [];
+          setGames([...data, ...customGames]);
+        }
       } catch (err) {
-        console.error('Error loading games JSON:', err);
-      } finally {
-        setLoading(false);
+        console.warn('Note: using bundled default games library:', err);
       }
     }
     fetchGames();

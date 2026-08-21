@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Game } from '../types';
 import {
   ArrowLeft,
@@ -38,6 +38,16 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
   const [showInfo, setShowInfo] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const gameSrc = useMemo(() => {
+    if (!game.url) return '';
+    if (game.url.startsWith('http://') || game.url.startsWith('https://') || game.url.startsWith('data:')) {
+      return game.url;
+    }
+    const cleanPath = game.url.startsWith('/') ? game.url.slice(1) : game.url;
+    const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+    return `${base}${cleanPath}`;
+  }, [game.url]);
 
   // Handle browser fullscreen events
   useEffect(() => {
@@ -139,7 +149,7 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
 
           <a
             id="player-newtab-btn"
-            href={game.url}
+            href={gameSrc}
             target="_blank"
             rel="noopener noreferrer"
             title="Open in Direct Standalone Tab"
@@ -166,7 +176,7 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
           ref={iframeRef}
           key={iframeKey}
           id="game-active-iframe"
-          src={game.url}
+          src={gameSrc}
           title={game.title}
           allow="autoplay; fullscreen; gamepad; focus-without-user-activation *"
           allowFullScreen
